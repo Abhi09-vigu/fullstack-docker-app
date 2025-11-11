@@ -1,1 +1,61 @@
-version: '3.8'
+version: "3.9"
+
+services:
+  db:
+    image: postgres:13
+    container_name: fullstack-db
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-testdb}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - fullstack-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: ./backend
+    container_name: fullstack-backend
+    environment:
+      DB_HOST: db
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-postgres}
+      DB_NAME: ${DB_NAME:-testdb}
+      DB_PORT: 5432
+      NODE_ENV: production
+    ports:
+      - "5000:5000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - fullstack-network
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    container_name: fullstack-frontend
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - fullstack-network
+    restart: unless-stopped
+    environment:
+      REACT_APP_API_URL: http://localhost:5000
+
+volumes:
+  db-data:
+    driver: local
+
+networks:
+  fullstack-network:
+    driver: bridge
